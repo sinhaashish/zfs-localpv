@@ -106,17 +106,34 @@ func IsPVCDeletedEventually(pvcName string) bool {
 		Should(gomega.BeTrue())
 }
 
-func createFstypeStorageClass(ftype string) {
+// VerifyStorageClassParams verifies the volume properties set at creation time
+func VerifyStorageClassParams(parameters map[string]string) {
+	for propertyKey, propertyVal := range parameters {
+		if propertyKey != "fstype" {
+			vol, err := ZFSClient.WithNamespace(OpenEBSNamespace).
+				Get(pvcObj.Spec.VolumeName, metav1.GetOptions{})
+			gomega.Expect(err).To(gomega.BeNil(), "while fetching the zfs volume {%s}", vol.Name)
+			status := IsPropUpdatedEventually(vol, propertyKey, propertyVal)
+			gomega.Expect(status).To(gomega.Equal(true), "while updating {%s%}={%s%} {%s}", propertyKey, propertyVal, vol.Name)
+		}
+	}
+}
+
+func createFstypeStorageClass(addons map[string]string) {
 	var (
 		err error
 	)
 
 	parameters := map[string]string{
 		"poolname": POOLNAME,
-		"fstype":   ftype,
 	}
 
-	ginkgo.By("building a " + ftype + " storage class")
+	// Update params with addons
+	for key, value := range addons {
+		parameters[key] = value
+	}
+
+	ginkgo.By("building a " + addons["ftype"] + " storage class")
 	scObj, err = sc.NewBuilder().
 		WithGenerateName(scName).
 		WithVolumeExpansion(true).
@@ -584,4 +601,57 @@ func deletePVC(pvcname string) {
 	ginkgo.By("verifying deleted pvc")
 	status := IsPVCDeletedEventually(pvcname)
 	gomega.Expect(status).To(gomega.Equal(true), "while trying to get deleted pvc")
+}
+
+func getStoragClassParams() []map[string]string {
+	parameter1 := map[string]string{
+		"fstype":      "zfs",
+		"compression": "lz4",
+	}
+	parameter2 := map[string]string{
+		"fstype":      "zfs",
+		"compression": "lz4",
+		"dedup":       "on",
+	}
+	parameter3 := map[string]string{
+		"fstype":        "zfs",
+		"compression":   "zstd-6",
+		"dedup":         "on",
+		"thinprovision": "yes",
+	}
+	parameter4 := map[string]string{
+		"fstype": "zfs",
+		"dedup":  "on",
+	}
+	parameter5 := map[string]string{
+		"fstype":        "zfs",
+		"compression":   "gzip",
+		"thinprovision": "yes",
+	}
+	parameter6 := map[string]string{
+		"fstype":        "zfs",
+		"compression":   "gzip",
+		"dedup":         "on",
+		"thinprovision": "yes",
+	}
+	parameter7 := map[string]string{
+		"fstype":      "xfs",
+		"compression": "zstd-6",
+	}
+	parameter8 := map[string]string{
+		"fstype":        "xfs",
+		"compression":   "zstd-6",
+		"dedup":         "on",
+		"thinprovision": "yes",
+	}
+	parameter9 := map[string]string{
+		"fstype": "ext4",
+		"dedup":  "on",
+	}
+	parameter10 := map[string]string{
+		"fstype":      "btrfs",
+		"compression": "zstd-6",
+		"dedup":       "on",
+	}
+	return []map[string]string{parameter1, parameter2, parameter3, parameter4, parameter5, parameter6, parameter7, parameter8, parameter9, parameter10}
 }
