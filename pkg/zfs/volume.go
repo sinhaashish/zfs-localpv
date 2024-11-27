@@ -116,12 +116,14 @@ func GetNodeID(nodename string) (string, error) {
 }
 
 func checkVolCreation(ctx context.Context, volname string) (bool, error) {
-	timeout := time.After(10 * time.Second)
+	timeout := time.NewTimer(10 * time.Second)
+	defer timeout.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return true, fmt.Errorf("zfs: context deadline reached")
-		case <-timeout:
+		case <-timeout.C:
 			return true, fmt.Errorf("zfs: vol creation timeout reached")
 		default:
 			vol, err := GetZFSVolume(volname)
