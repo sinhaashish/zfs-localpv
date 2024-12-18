@@ -808,6 +808,10 @@ func (cs *controller) DeleteSnapshot(
 
 	klog.Infof("DeleteSnapshot request for %s", req.SnapshotId)
 
+	if err := cs.validateDeleteSnapshotReq(req); err != nil {
+		return nil, err
+	}
+
 	// snapshodID is formed as <volname>@<snapname>
 	// parsing them here
 	snapshotID := strings.Split(req.SnapshotId, "@")
@@ -1128,4 +1132,33 @@ func LabelIndexFunc(label string) cache.IndexFunc {
 		}
 		return vs, nil
 	}
+}
+
+func (cs *controller) validateDeleteSnapshotReq(req *csi.DeleteSnapshotRequest) error {
+	if req.GetSnapshotId() == "" {
+		return status.Errorf(codes.InvalidArgument, "DeleteSnapshot: empty snapshotID")
+	}
+
+	cloneList, err := zfs.GetClonesForSnapshot(req.SnapshotId)
+	if err != nil {
+		return status.Errorf(
+			codes.NotFound,
+			"failed to handle delete snapshot request for {%s}, "+
+				"validation failed checking for existing clones. Error: %s",
+			req.GetSnapshotId(),
+			err.Error(),
+		)
+	}
+
+	// snapshot delete is not supported if clones exist for this snapshot
+	if len(cloneList.Items) != 0 {
+		return status.Errorf(
+			codes.Internal,
+			"failed to handle delete volume request for {%s} with %d clones",
+			req.GetSnapshotId(),
+			len(cloneList.Items),
+		)
+	}
+
+	return nil
 }

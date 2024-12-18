@@ -315,6 +315,24 @@ func GetZFSSnapshotStatus(snapID string) (string, error) {
 	return snap.Status.State, nil
 }
 
+// GetClonesForSnapshot lists all the clone volumes for the given snapshot
+func GetClonesForSnapshot(snapID string) (*apis.ZFSVolumeList, error) {
+	zfsVolList, err := volbuilder.NewKubeclient().WithNamespace(OpenEBSNamespace).List(metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	listBuilder := volbuilder.ListBuilderFrom(*zfsVolList)
+	listBuilder.WithFilter(func(vol *volbuilder.ZFSVolume) bool {
+		if vol.Object.Spec.SnapName == snapID {
+			return true
+		}
+		return false
+	})
+
+	return listBuilder.List(), nil
+}
+
 // GetZFSSnapshotCapacity return capacity converted to int64
 func GetZFSSnapshotCapacity(snap *apis.ZFSSnapshot) (int64, error) {
 	if snap == nil {
