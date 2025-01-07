@@ -3,11 +3,12 @@
 set -e
 
 SNAP_CLASS=deploy/sample/zfssnapclass.yaml
+export OPENEBS_NAMESPACE=${OPENEBS_NAMESPACE:-openebs}
 TEST_DIR="tests"
 
 # Prepare env for running BDD tests
 # Minikube is already running
-helm install zfs-localpv ./deploy/helm/charts -n "$OPENEBS_NAMESPACE" --create-namespace --set zfsPlugin.pullPolicy=Never --set analytics.enabled=false
+helm install zfs-localpv ./deploy/helm/charts -n "$OPENEBS_NAMESPACE" --create-namespace --set zfsPlugin.image.pullPolicy=Never --set analytics.enabled=false
 kubectl apply -f "$SNAP_CLASS"
 
 dumpAgentLogs() {
