@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.20.14 as build
+FROM golang:1.20.14 AS build
 
 ARG BRANCH
 ARG RELEASE_TAG
@@ -34,7 +34,7 @@ WORKDIR /go/src/github.com/openebs/zfs-localpv/
 RUN apt-get update && apt-get install -y make git
 
 COPY go.mod go.sum ./
-# Get dependancies - will also be cached if we won't change mod/sum
+# Get dependencies - will also be cached if we won't change mod/sum
 RUN go mod download
 
 COPY . .

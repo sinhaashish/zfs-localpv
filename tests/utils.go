@@ -17,6 +17,9 @@ limitations under the License.
 package tests
 
 import (
+	"fmt"
+	"k8s.io/klog/v2"
+	"os/exec"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -84,12 +87,29 @@ func IsPodRunningEventually(namespace, podName string) bool {
 // IsPropUpdatedEventually checks if the property is updated or not eventually
 func IsPropUpdatedEventually(vol *apis.ZFSVolume, prop string, val string) bool {
 	return gomega.Eventually(func() bool {
-		newVal, err := zfs.GetVolumeProperty(vol, prop)
+		newVal, err := GetVolumeProperty(vol, prop)
 		gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 		return (newVal == val)
 	},
 		60, 5).
 		Should(gomega.BeTrue())
+}
+
+// GetVolumeProperty gets zfs properties for the volume
+func GetVolumeProperty(vol *apis.ZFSVolume, prop string) (string, error) {
+	var ZFSVolArg []string
+	volume := vol.Spec.PoolName + "/" + vol.Name
+
+	ZFSVolArg = append(ZFSVolArg, zfs.ZFSVolCmd, zfs.ZFSGetArg, "-pH", "-o", "value", prop, volume)
+	cmd := exec.Command("sudo", ZFSVolArg...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.Errorf("zfs: could not get %s on dataset %v cmd %v error: %s",
+			prop, volume, ZFSVolArg, string(out))
+		return "", fmt.Errorf("zfs get %s failed, %s", prop, string(out))
+	}
+	val := out[:len(out)-1]
+	return string(val), nil
 }
 
 // IsPVCDeletedEventually tries to get the deleted pvc

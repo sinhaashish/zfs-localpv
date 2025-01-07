@@ -10,8 +10,8 @@ VETARGS?=-asmdecl -atomic -bool -buildtags -copylocks -methods \
 EXTERNAL_TOOLS=\
 	golang.org/x/tools/cmd/cover@latest \
 	golang.org/x/lint/golint@latest \
-	github.com/axw/gocov/gocov@latest \
-	gopkg.in/matm/v1/gocov-html@latest \
+	github.com/axw/gocov/gocov@v1.1 \
+	github.com/matm/gocov-html/cmd/gocov-html@latest \
 	github.com/onsi/ginkgo/v2/ginkgo@v2.20.1
 
 # The images can be pushed to any docker/image registeries

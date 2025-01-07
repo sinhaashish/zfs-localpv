@@ -6,6 +6,37 @@ SNAP_CLASS=deploy/sample/zfssnapclass.yaml
 export OPENEBS_NAMESPACE=${OPENEBS_NAMESPACE:-openebs}
 TEST_DIR="tests"
 
+CRDS_TO_DELETE_ON_CLEANUP="zfsrestores.zfs.openebs.io zfssnapshots.zfs.openebs.io zfsvolumes.zfs.openebs.io zfsbackups.zfs.openebs.io zfsnodes.zfs.openebs.io"
+
+cleanup() {
+  set +e
+
+  echo "Cleaning up test resources"
+
+  if kubectl get nodes 2>/dev/null; then
+    kubectl delete pvc -n "$OPENEBS_NAMESPACE" --all
+    kubectl delete -f "${SNAP_CLASS}"
+
+    helm uninstall zfs-localpv -n "$OPENEBS_NAMESPACE" --wait
+    # shellcheck disable=SC2086
+    kubectl delete crds $CRDS_TO_DELETE_ON_CLEANUP
+  fi
+
+  set -e
+  # always return true
+  return 0
+}
+# trap "cleanup 2>/dev/null" EXIT
+[ -n "${CLEANUP_ONLY}" ] && cleanup && exit 0
+[ -n "${RESET}" ] && cleanup
+
+# allow override
+if [ -z "${KUBECONFIG}" ]
+then
+  export KUBECONFIG="${HOME}/.kube/config"
+fi
+
+
 # Prepare env for running BDD tests
 # Minikube is already running
 helm install zfs-localpv ./deploy/helm/charts -n "$OPENEBS_NAMESPACE" --create-namespace --set zfsPlugin.image.pullPolicy=Never --set analytics.enabled=false
