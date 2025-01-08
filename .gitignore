@@ -7,3 +7,5 @@ tags
 *.swn
 *.idea
 *.test
+/coverage.txt
+/tests/bdd_coverage.txt

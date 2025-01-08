@@ -32,8 +32,10 @@ jobs:
           ./scripts/validate-chart-version.sh --branch $BRANCH
 
       - name: Run chart-testing lint
-        run: |
-          ct lint --config ct.yaml
+        run: ct lint --config ct.yaml
+
+      - name: Run golint
+        run: make golint
 
   unit-tests:
     runs-on: ubuntu-22.04
@@ -47,6 +49,11 @@ jobs:
         with:
           go-version: 1.20.14
           cache: false
+
+      - name: Set go env
+        run: |
+          echo "GOPATH=$(go env GOPATH)" >> $GITHUB_ENV
+          echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
 
       - name: Unit test
         run: make test
@@ -76,8 +83,13 @@ jobs:
           go-version: 1.20.14
           cache: false
 
+      - name: Set go env
+        run: |
+          echo "GOPATH=$(go env GOPATH)" >> $GITHUB_ENV
+          echo "GOCACHE=$(go env GOCACHE)" >> $GITHUB_ENV
+
       - name: Build images locally
-        run: make zfs-driver-image || exit 1;
+        run: make zfs-driver-image
 
       - name: Setup zfs pools
         run: |

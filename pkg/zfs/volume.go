@@ -101,6 +101,10 @@ func init() {
 	GoogleAnalyticsEnabled = os.Getenv(GoogleAnalyticsKey)
 }
 
+// GetNodeID returns the Node ID of the given K8s nodename.
+// It may return an error whilst fetching the node using the k8sapi.
+// If the K8s node object does contain the topology label, then the nodename
+// itself is returned as the Node ID.
 func GetNodeID(nodename string) (string, error) {
 	node, err := k8sapi.GetNode(nodename)
 	if err != nil {

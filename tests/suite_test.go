@@ -30,7 +30,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/klog/v2"
 
 	// auth plugins
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -72,7 +71,7 @@ func init() {
 
 	OpenEBSNamespace = os.Getenv("OPENEBS_NAMESPACE")
 	if OpenEBSNamespace == "" {
-		klog.Fatalf("OPENEBS_NAMESPACE environment variable not set")
+		os.Setenv("OPENEBS_NAMESPACE", "openebs")
 	}
 	SCClient = sc.NewKubeClient(sc.WithKubeConfigPath(KubeConfigPath))
 	PVCClient = pvc.NewKubeClient(pvc.WithKubeConfigPath(KubeConfigPath))

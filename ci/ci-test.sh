@@ -3,34 +3,66 @@
 set -e
 
 SNAP_CLASS=deploy/sample/zfssnapclass.yaml
+export OPENEBS_NAMESPACE=${OPENEBS_NAMESPACE:-openebs}
 TEST_DIR="tests"
+
+CRDS_TO_DELETE_ON_CLEANUP="zfsrestores.zfs.openebs.io zfssnapshots.zfs.openebs.io zfsvolumes.zfs.openebs.io zfsbackups.zfs.openebs.io zfsnodes.zfs.openebs.io"
+
+cleanup() {
+  set +e
+
+  echo "Cleaning up test resources"
+
+  if kubectl get nodes 2>/dev/null; then
+    kubectl delete pvc -n "$OPENEBS_NAMESPACE" --all
+    kubectl delete -f "${SNAP_CLASS}"
+
+    helm uninstall zfs-localpv -n "$OPENEBS_NAMESPACE" --wait
+    # shellcheck disable=SC2086
+    kubectl delete crds $CRDS_TO_DELETE_ON_CLEANUP
+  fi
+
+  set -e
+  # always return true
+  return 0
+}
+# trap "cleanup 2>/dev/null" EXIT
+[ -n "${CLEANUP_ONLY}" ] && cleanup && exit 0
+[ -n "${RESET}" ] && cleanup
+
+# allow override
+if [ -z "${KUBECONFIG}" ]
+then
+  export KUBECONFIG="${HOME}/.kube/config"
+fi
+
 
 # Prepare env for running BDD tests
 # Minikube is already running
-helm install zfs-localpv ./deploy/helm/charts -n $OPENEBS_NAMESPACE --create-namespace --set zfsPlugin.pullPolicy=Never --set analytics.enabled=false
+helm install zfs-localpv ./deploy/helm/charts -n "$OPENEBS_NAMESPACE" --create-namespace --set zfsPlugin.image.pullPolicy=Never --set analytics.enabled=false
 kubectl apply -f "$SNAP_CLASS"
 
 dumpAgentLogs() {
   NR=$1
-  AgentPOD=$(kubectl get pods -l app=openebs-zfs-node -o jsonpath='{.items[0].metadata.name}' -n $OPENEBS_NAMESPACE)
-  kubectl describe po "$AgentPOD" -n $OPENEBS_NAMESPACE
+  AgentPOD=$(kubectl get pods -l app=openebs-zfs-node -o jsonpath='{.items[0].metadata.name}' -n "$OPENEBS_NAMESPACE")
+  kubectl describe po "$AgentPOD" -n "$OPENEBS_NAMESPACE"
   printf "\n\n"
-  kubectl logs --tail="${NR}" "$AgentPOD" -n $OPENEBS_NAMESPACE -c openebs-zfs-plugin
+  kubectl logs --tail="${NR}" "$AgentPOD" -n "$OPENEBS_NAMESPACE" -c openebs-zfs-plugin
   printf "\n\n"
 }
 
 dumpControllerLogs() {
   NR=$1
-  ControllerPOD=$(kubectl get pods -l app=openebs-zfs-controller -o jsonpath='{.items[0].metadata.name}' -n $OPENEBS_NAMESPACE)
-  kubectl describe po "$ControllerPOD" -n $OPENEBS_NAMESPACE
+  ControllerPOD=$(kubectl get pods -l app=openebs-zfs-controller -o jsonpath='{.items[0].metadata.name}' -n "$OPENEBS_NAMESPACE")
+  kubectl describe po "$ControllerPOD" -n "$OPENEBS_NAMESPACE"
   printf "\n\n"
-  kubectl logs --tail="${NR}" "$ControllerPOD" -n $OPENEBS_NAMESPACE -c openebs-zfs-plugin
+  kubectl logs --tail="${NR}" "$ControllerPOD" -n "$OPENEBS_NAMESPACE" -c openebs-zfs-plugin
   printf "\n\n"
 }
 
 
 isPodReady(){
-  [ "$(kubectl get po "$1" -o 'jsonpath={.status.conditions[?(@.type=="Ready")].status}' -n $OPENEBS_NAMESPACE)" = 'True' ]
+  [ "$(kubectl get po "$1" -o 'jsonpath={.status.conditions[?(@.type=="Ready")].status}' -n "$OPENEBS_NAMESPACE")" = 'True' ]
 }
 
 
@@ -46,7 +78,7 @@ waitForZFSDriver() {
   interval=1
   i=0
   while [ "$i" -le "$period" ]; do
-    zfsDriver="$(kubectl get pods -l role=openebs-zfs -o 'jsonpath={.items[*].metadata.name}' -n $OPENEBS_NAMESPACE)"
+    zfsDriver="$(kubectl get pods -l role=openebs-zfs -o 'jsonpath={.items[*].metadata.name}' -n "$OPENEBS_NAMESPACE")"
     if isDriverReady "$zfsDriver"; then
       return 0
     fi
@@ -69,7 +101,7 @@ runTestSuite() {
 
   cd $TEST_DIR
 
-  kubectl get po -n $OPENEBS_NAMESPACE
+  kubectl get po -n "$OPENEBS_NAMESPACE"
 
   set +e
 
@@ -102,10 +134,10 @@ runTestSuite() {
   kubectl get sc --all-namespaces -oyaml
 
   echo "get zfs volume details"
-  kubectl get zfsvolumes.zfs.openebs.io -n $OPENEBS_NAMESPACE -oyaml
+  kubectl get zfsvolumes.zfs.openebs.io -n "$OPENEBS_NAMESPACE" -oyaml
 
   echo "get zfs snapshot details"
-  kubectl get zfssnapshots.zfs.openebs.io -n $OPENEBS_NAMESPACE -oyaml
+  kubectl get zfssnapshots.zfs.openebs.io -n "$OPENEBS_NAMESPACE" -oyaml
 
   exit 1
   fi
@@ -114,17 +146,19 @@ runTestSuite() {
 runTestSuite bdd_coverage.txt "!custom-node-id"
 
 prepareCustomNodeIdEnv() {
-  for node in $(kubectl get nodes -n $OPENEBS_NAMESPACE -o jsonpath='{.items[*].metadata.name}'); do
-      local zfsNode=$(kubectl get zfsnode -n $OPENEBS_NAMESPACE -o jsonpath="{.items[?(@.metadata.ownerReferences[0].name=='${node}')].metadata.name}")
+  for node in $(kubectl get nodes -n "$OPENEBS_NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
+      local zfsNode
+      zfsNode=$(kubectl get zfsnode -n "$OPENEBS_NAMESPACE" -o jsonpath="{.items[?(@.metadata.ownerReferences[0].name=='${node}')].metadata.name}")
       echo "Relabeling node ${node} with ${node}-custom-id"
       kubectl label node "${node}" openebs.io/nodeid="${node}-custom-id" --overwrite
 
-      local nodeDriver=$(kubectl get pods -l name=openebs-zfs-node -o jsonpath="{.items[?(@.spec.nodeName=='${node}')].metadata.name}" -n $OPENEBS_NAMESPACE)
+      local nodeDriver
+      nodeDriver=$(kubectl get pods -l name=openebs-zfs-node -o jsonpath="{.items[?(@.spec.nodeName=='${node}')].metadata.name}" -n "$OPENEBS_NAMESPACE")
       echo "Restarting ${nodeDriver} on ${node} to pick up the new node id"
-      kubectl delete pod "${nodeDriver}" -n $OPENEBS_NAMESPACE
+      kubectl delete pod "${nodeDriver}" -n "$OPENEBS_NAMESPACE"
 
       echo "Deleting old zfsnode ${zfsNode}"
-      kubectl delete zfsnode "${zfsNode}" -n $OPENEBS_NAMESPACE
+      kubectl delete zfsnode "${zfsNode}" -n "$OPENEBS_NAMESPACE"
   done
 }
 

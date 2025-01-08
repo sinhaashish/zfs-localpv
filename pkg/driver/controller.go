@@ -439,7 +439,7 @@ func (cs *controller) CreateVolume(
 ) (*csi.CreateVolumeResponse, error) {
 
 	var err error
-	var selectedNodeId string
+	var selectedNodeID string
 
 	if err = cs.validateVolumeCreateReq(req); err != nil {
 		return nil, err
@@ -459,23 +459,23 @@ func (cs *controller) CreateVolume(
 	if contentSource != nil && contentSource.GetSnapshot() != nil {
 		snapshotID := contentSource.GetSnapshot().GetSnapshotId()
 
-		selectedNodeId, err = CreateSnapClone(ctx, req, snapshotID)
+		selectedNodeID, err = CreateSnapClone(ctx, req, snapshotID)
 	} else if contentSource != nil && contentSource.GetVolume() != nil {
 		srcVol := contentSource.GetVolume().GetVolumeId()
-		selectedNodeId, err = CreateVolClone(ctx, req, srcVol)
+		selectedNodeID, err = CreateVolClone(ctx, req, srcVol)
 	} else {
-		selectedNodeId, err = CreateZFSVolume(ctx, req)
+		selectedNodeID, err = CreateZFSVolume(ctx, req)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	klog.Infof("created the volume %s/%s on node %s", pool, volName, selectedNodeId)
+	klog.Infof("created the volume %s/%s on node %s", pool, volName, selectedNodeID)
 
 	sendEventOrIgnore(pvcName, volName, strconv.FormatInt(int64(size), 10), analytics.VolumeProvision)
 
-	topology := map[string]string{zfs.ZFSTopologyKey: selectedNodeId}
+	topology := map[string]string{zfs.ZFSTopologyKey: selectedNodeID}
 	cntx := map[string]string{zfs.PoolNameKey: pool, zfs.OpenEBSCasTypeKey: zfs.ZFSCasTypeName}
 
 	return csipayload.NewCreateVolumeResponseBuilder().
@@ -906,19 +906,18 @@ func (cs *controller) GetCapacity(
 		poolParamSliced := strings.SplitN(poolParam, "/", 2)
 		if len(poolParamSliced) == 2 {
 			return poolParamSliced[0], poolParamSliced[1]
-		} else {
-			return poolParamSliced[0], ""
 		}
+		return poolParamSliced[0], ""
 	}()
 
 	var availableCapacity int64
 	for _, nodeName := range nodeNames {
-		mappedNodeId, mapErr := zfs.GetNodeID(nodeName)
+		mappedNodeID, mapErr := zfs.GetNodeID(nodeName)
 		if mapErr != nil {
 			klog.Warningf("Unable to find mapped node id for %s", nodeName)
-			mappedNodeId = nodeName
+			mappedNodeID = nodeName
 		}
-		v, exists, err := zfsNodesCache.GetByKey(zfs.OpenEBSNamespace + "/" + mappedNodeId)
+		v, exists, err := zfsNodesCache.GetByKey(zfs.OpenEBSNamespace + "/" + mappedNodeID)
 		if err != nil {
 			klog.Warning("unexpected error after querying the zfsNode informer cache")
 			continue
