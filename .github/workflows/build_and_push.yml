@@ -32,8 +32,10 @@ jobs:
           ./scripts/validate-chart-version.sh --branch $BRANCH
 
       - name: Run chart-testing lint
-        run: |
-          ct lint --config ct.yaml
+        run: ct lint --config ct.yaml
+
+      - name: Run golint
+        run: make golint
 
   unit-tests:
     runs-on: ubuntu-22.04
